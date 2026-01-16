@@ -1,11 +1,21 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import Particles, { initParticlesEngine } from '@tsparticles/react'
 import { loadSlim } from '@tsparticles/slim'
+import { settingsAPI } from './services/api'
 import Home from './pages/Home'
 import About from './pages/About'
 import Projects from './pages/Projects'
 import Contact from './pages/Contact'
+
+// Admin imports
+import Login from './admin/Login'
+import DashboardLayout from './admin/DashboardLayout'
+import Dashboard from './admin/Dashboard'
+import ProjectsPage from './admin/ProjectsPage'
+import SettingsPage from './admin/SettingsPage'
+import AboutPage from './admin/AboutPage'
+import ProtectedRoute from './admin/ProtectedRoute'
 
 export default function App() {
     const [menuOpen, setMenuOpen] = useState(false)
@@ -13,10 +23,33 @@ export default function App() {
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
     const [fontSize, setFontSize] = useState(() => localStorage.getItem('fontSize') || 'medium')
+    const [siteSettings, setSiteSettings] = useState({ logoName: 'M.Mahdi', personName: 'Mohamed Mahdi' })
+    const location = useLocation()
+
+    // Check if we're on admin pages
+    const isAdminRoute = location.pathname.startsWith('/admin')
 
     const toggleMenu = () => setMenuOpen(!menuOpen)
     const closeMenu = () => setMenuOpen(false)
     const toggleSettings = () => setSettingsOpen(!settingsOpen)
+
+    // Fetch site settings (logo name, person name)
+    useEffect(() => {
+        const fetchSiteSettings = async () => {
+            try {
+                const response = await settingsAPI.get()
+                if (response.data) {
+                    setSiteSettings(prev => ({
+                        logoName: response.data.logoName || prev.logoName,
+                        personName: response.data.personName || prev.personName
+                    }))
+                }
+            } catch (error) {
+                console.log('Using default site settings')
+            }
+        }
+        fetchSiteSettings()
+    }, [])
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme)
@@ -108,6 +141,25 @@ export default function App() {
         }
     }, [theme])
 
+    // If on admin routes, render admin layout only
+    if (isAdminRoute) {
+        return (
+            <Routes>
+                <Route path="/admin" element={<Login />} />
+                <Route path="/admin/*" element={
+                    <ProtectedRoute>
+                        <DashboardLayout />
+                    </ProtectedRoute>
+                }>
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="projects" element={<ProjectsPage />} />
+                    <Route path="about" element={<AboutPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                </Route>
+            </Routes>
+        )
+    }
+
     return (
         <div className="app">
             {particlesInit && (
@@ -121,7 +173,7 @@ export default function App() {
                 <div className="header-inner">
                     <a href="/" className="logo">
                         <span className="logo-icon">&lt;/&gt;</span>
-                        <span className="logo-text">M<span className="logo-dot">.</span>Mahdi</span>
+                        <span className="logo-text">{siteSettings.logoName}</span>
                     </a>
                     <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
                         <NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''} onClick={closeMenu}>Home</NavLink>
@@ -193,11 +245,11 @@ export default function App() {
             </header>
             <main className="main">
                 <Routes>
-                    <Route path="/" element={<Home />} />
+                    <Route path="/" element={<Home personName={siteSettings.personName} />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/projects" element={<Projects />} />
                     <Route path="/contact" element={<Contact />} />
-                    <Route path="/services" element={<Home />} />
+                    <Route path="/services" element={<Home personName={siteSettings.personName} />} />
                 </Routes>
             </main>
         </div>
